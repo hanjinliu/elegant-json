@@ -1,4 +1,4 @@
-from elegant_json import JsonClass
+import elegant_json as ej
 from pathlib import Path
 import pytest
 
@@ -31,45 +31,55 @@ template_3 = {
     }
 }
 
-@pytest.mark.parametrize(
-    ["temp", "i"],
-    [(template_1, 1), (template_2, 2), (template_3, 3)]
-)
-def test_properties(temp, i):
-    class C(JsonClass):
-        __json_template__ = temp
-        arg1: int
-        arg2: str
-        arg3: list[int]
-    
-    c = C.load(root/f"test{i}.json")
+def _common_part(c: ej.JsonClass, mutable):
     assert c.arg1 == 1
     assert c.arg2 == "a"
     assert c.arg3 == [1, 2, 3]
+
+    if mutable:
+        c.arg1 = 2
+        c.arg2 = "t"
+        c.arg3 = [0]
+        
+        assert c.arg1 == 2
+        assert c.arg2 == "t"
+        assert c.arg3 == [0]
 
 @pytest.mark.parametrize(
     ["temp", "i"],
     [(template_1, 1), (template_2, 2), (template_3, 3)]
 )
-def test_mutability(temp, i):
-    class C(JsonClass):
+@pytest.mark.parametrize("mutable", [False, True])
+def test_json_class(temp, i, mutable):
+    class C(ej.JsonClass):
         __json_template__ = temp
-        __json_mutable__ = True
+        __json_mutable__ = mutable
         arg1: int
         arg2: str
         arg3: list[int]
     
     c = C.load(root/f"test{i}.json")
-    assert c.arg1 == 1
-    assert c.arg2 == "a"
-    assert c.arg3 == [1, 2, 3]
+    _common_part(c, mutable)
+
+@pytest.mark.parametrize(
+    ["temp", "i"],
+    [(template_1, 1), (template_2, 2), (template_3, 3)]
+)
+@pytest.mark.parametrize("mutable", [False, True])
+def test_constructor(temp, i, mutable):
+    init = ej.create_constructor(temp, mutable=mutable)
     
-    c.arg1 = 2
-    c.arg2 = "t"
-    c.arg3 = [0]
+    c = init.load(root/f"test{i}.json")
+    _common_part(c, mutable)
+
+@pytest.mark.parametrize(
+    ["temp", "i"],
+    [(template_1, 1), (template_2, 2), (template_3, 3)]
+)
+@pytest.mark.parametrize("mutable", [False, True])
+def test_loader(temp, i, mutable):
+    loader = ej.create_loader(temp, mutable=mutable)
     
-    assert c.arg1 == 2
-    assert c.arg2 == "t"
-    assert c.arg3 == [0]
-    
+    c = loader(root/f"test{i}.json")
+    _common_part(c, mutable)
     

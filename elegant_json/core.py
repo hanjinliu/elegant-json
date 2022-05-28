@@ -1,6 +1,7 @@
 from __future__ import annotations
+import json
 from typing import Callable, TypeVar, overload
-from ._json_class import JsonClassMeta, JsonClass, _JSON_TEMPLATE, _JSON_MUTABLE
+from ._json_class import JsonClass, _JSON_TEMPLATE, _JSON_MUTABLE
 
 _C = TypeVar("_C", bound=type)
 
@@ -53,10 +54,19 @@ def jsonclass(cls_or_template = None, template=None, mutable=False):
     new_cls = type(cls.__name__, (cls, JsonClass), ns)
     return new_cls
 
+class _dummy:
+    pass
+
 def create_constructor(template=None, mutable=False):
-    cls = jsonclass(object, template=template, mutable=mutable)
+    cls = jsonclass(_dummy, template=template, mutable=mutable)
     return cls
 
 def create_loader(template=None, mutable=False):
-    cls = jsonclass(object, template=template, mutable=mutable)
-    return cls.load
+    cls = jsonclass(_dummy, template=template, mutable=mutable)
+    # NOTE: simply this function can return `cls.load` but will not work if
+    # new class has `load` property by chance.
+    def load(path: str, encoding: str | None = None):
+        with open(path, mode="r", encoding=encoding) as f:
+            js = json.load(f)
+        return cls(js)
+    return load
