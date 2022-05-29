@@ -69,8 +69,34 @@ class C(JsonClass):
     last_modified: str
     values: list[int]
 
-js = C.load("path/to/json")
-js.title
-js.last_modified
-js.values[2]
+c = C.load("path/to/json")  # or from a dict >>> c = C(js)
+c.title
+c.last_modified
+c.values[2]
 ```
+
+##### Other helper functions
+
+- `isformatted`
+    This function checks if a dictionary is in the given format
+
+    ```python
+    from elegant_json import isformatted
+
+    dict0 = {
+        "title": "Formatted data",
+        "data": {
+            "last modified": "yyyy.mm.dd",
+            "values": []
+        }
+    }
+    isformatted(dict0, C)  # True
+
+    dict1 = {
+        "title": "Wrong data",
+        "data": {
+            "a": 0,
+            "b": 2,
+        }
+    }
+    isformatted(dict1, C)  # False
