@@ -1,9 +1,9 @@
 from __future__ import annotations
 import json
 from pathlib import Path
-from types import GenericAlias
-from typing import Any, Iterable, TYPE_CHECKING, TypeVar, get_args, get_origin
+from typing import Any, Iterable
 
+from ._json_attribute import Attr
 
 _JSON_TEMPLATE = "__json_template__"
 _JSON_MUTABLE = "__json_mutable__"
@@ -28,86 +28,11 @@ def _iter_list(l: Iterable[Any | None], keys: list[str | int]) -> Iterable[tuple
         else:
             yield v, next_keys
 
-def _define_converter(annotation):
-    if annotation is None:
-        converter = lambda x: x
-    elif isinstance(annotation, GenericAlias):
-        origin = get_origin(annotation)
-        args = get_args(annotation)
-        if origin is list:
-            arg = args[0]
-            if isinstance(arg, type):
-                converter = lambda x: list(_define_converter(arg)(a) for a in x)
-            else:
-                raise ValueError
-        elif origin is dict:
-            if args[0] is not str:
-                raise TypeError("Only dict[str, ...] is supported.")
-            val = args[1]
-            if isinstance(val, type):
-                converter = lambda x: {k: _define_converter(val)(v) for k, v in x.items()}
-            else:
-                raise ValueError
-        elif origin is tuple:
-            converter = lambda x: tuple(_define_converter(arg)(a) for arg, a in zip(args, x))
-        else:
-            raise ValueError
-    else:
-        converter = lambda x: annotation(x)
-    return converter
-
-class Attr:
-    def __init__(
-        self,
-        name: str | None = None, 
-        annotation: type | None = None,
-        *,
-        default = None,
-        mutable: bool | None = None,
-    ):
-        self.name = name
-        self.default = default
-        self.mutable = mutable or False
-        self.mutability_given = mutable is not None
-        self.converter = _define_converter(annotation)
-        
-    @property
-    def name(self) -> str | None:
-        return self._name
-    
-    @name.setter
-    def name(self, value: str | None):
-        if value is not None and not value.isidentifier():
-            raise ValueError(f"{value!r} is not an identifier.")
-        self._name = value
-    
-    def to_property(self, keys: list[str | int]) -> property:
-        def fget(jself: JsonClass):
-            out = jself._json
-            try:
-                for k in keys:
-                    out = out[k]  # type: ignore
-            except (KeyError, IndexError):
-                out = self.default
-            return self.converter(out)
-        
-        prop = property(fget)
-        
-        if self.mutable:
-            def fset(jself: JsonClass, value):
-                out = jself._json
-                for k in keys[:-1]:
-                    out = out[k]  # type: ignore
-                out[keys[-1]] = value  # type: ignore
-                return None
-        
-            prop = prop.setter(fset)
-        
-        return prop
 
 class JsonClassMeta(type):
     __json_template__: dict[str, Any | None] = {}
     __json_mutable__: bool = False
+    _json_properties: frozenset[str]
 
     def __new__(
         cls: type,
@@ -119,7 +44,7 @@ class JsonClassMeta(type):
         
         js_temp = namespace.get(_JSON_TEMPLATE, {})
         mutable = namespace.get(_JSON_MUTABLE, False)
-        ns = set()
+        props = set()
         for value, keys in _iter_dict(js_temp, []):
             if isinstance(value, str):
                 attr = Attr(value, mutable=mutable)
@@ -134,13 +59,14 @@ class JsonClassMeta(type):
                     attr.mutable = mutable
             else:
                 continue
-            if attr.name in ns:
+            if attr.name in props:
                 raise ValueError(f"Name collision in attributes: {attr.name!r}.")
-            ns.add(attr.name)
+            props.add(attr.name)
             prop = attr.to_property(keys)
             namespace[attr.name] = prop
         
         jcls: JsonClassMeta = type.__new__(cls, name, bases, namespace, **kwds)
+        jcls._json_properties = frozenset(props)
         return jcls
 
 

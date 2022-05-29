@@ -3,6 +3,7 @@ import json
 from pathlib import Path
 from typing import Callable, Literal, TypeVar, overload, Any
 from ._json_class import JsonClass, _JSON_TEMPLATE, _JSON_MUTABLE
+from ._json_attribute import JsonProperty
 
 _C = TypeVar("_C")
 
@@ -80,3 +81,17 @@ def create_loader(template: dict[str, Any | None], mutable: bool = False, name=N
             js = json.load(f)
         return cls(js)  # type: ignore
     return load
+
+
+def isformatted(obj, json_class: type[JsonClass]) -> bool:
+    if not isinstance(obj, dict):
+        return False
+    for name in json_class._json_properties:
+        prop: JsonProperty = getattr(json_class, name)
+        try:
+            out: Any = obj
+            for k in prop.keys():
+                out = out[k]
+        except (KeyError, IndexError):
+            return False
+    return True

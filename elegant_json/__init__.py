@@ -4,6 +4,7 @@ from .core import (
     jsonclass,
     create_loader,
     create_constructor,
+    isformatted,
 )
 
 from ._json_class import JsonClass, Attr
@@ -14,4 +15,5 @@ __all__ = [
     "jsonclass",
     "create_loader",
     "create_constructor",
+    "isformatted",
 ]
