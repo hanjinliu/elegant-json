@@ -52,6 +52,8 @@ This is terrible.
 
 ##### In this module
 
+Copy json and substitute values you want with `Attr` object.
+
 ```python
 from elegant_json import JsonClass, Attr
 
@@ -78,6 +80,7 @@ c.values[2]
 ##### Other helper functions
 
 - `isformatted`
+
     This function checks if a dictionary is in the given format
 
     ```python

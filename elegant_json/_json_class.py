@@ -54,7 +54,9 @@ class JsonClassMeta(type):
                 if attr.name is None:
                     attr_name = keys[-1]
                     if not isinstance(attr_name, str):
-                        raise ValueError
+                        raise TypeError(
+                            "Attr objects in a list need `name` argument."
+                        )
                     attr.name = attr_name
                 if not attr.mutability_given:
                     attr.mutable = _mutable
@@ -104,3 +106,18 @@ class JsonClass(metaclass=JsonClassMeta):
         with open(path, mode="r", encoding=encoding) as f:
             js = json.load(f)
         return cls(js)
+
+    def attr_asdict(self) -> dict[str, Any | None]:
+        """Summarize JsonClass properties into a dict."""
+        out: dict[str, Any | None] = {}
+        for jprop_name in self.__class__._json_properties:
+            value = getattr(self, jprop_name)
+            out[jprop_name] = value
+        return out
+
+    def attr_astuple(self) -> tuple[Any | None, ...]:
+        """Summarize JsonClass properties into a tuple."""
+        return tuple(
+            getattr(self, jprop_name) 
+            for jprop_name in self.__class__._json_properties
+        )

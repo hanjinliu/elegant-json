@@ -1,4 +1,3 @@
-from typing import Any
 import elegant_json as ej
 from pathlib import Path
 import pytest
@@ -93,3 +92,19 @@ def test_decorator():
         
     c = A.load(root/f"test1.json")
     _common_part(c, False)
+
+def test_override():
+    temp = {"load": ej.Attr()}
+    class A(ej.JsonClass):
+        __json_template__ = temp
+    
+    a = A({"load": 0})
+    assert a.load == 0
+    
+    @ej.jsonclass(temp)
+    class B:
+        pass
+    
+    a = B({"load": 0})
+    assert a.load == 0
+    
