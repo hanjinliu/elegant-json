@@ -1,7 +1,7 @@
 from __future__ import annotations
 import json
 from pathlib import Path
-from typing import Callable, Literal, TypeVar, overload, Any, Optional
+from typing import Callable, Literal, TypeVar, overload, Any
 from ._json_class import JsonClass, _JSON_TEMPLATE, _JSON_MUTABLE
 from ._json_attribute import JsonProperty
 

@@ -10,7 +10,7 @@ with open("README.md") as f:
 setup(
     name="elegant-json",
     version=VERSION,
-    description="Generate multifunctional GUIs from classes",
+    description="Deal with JSON in an elegant way",
     long_description=readme,
     long_description_content_type="text/markdown",
     author="Hanjin Liu",

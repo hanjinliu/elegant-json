@@ -4,9 +4,17 @@ Deal with JSON files elegantly.
 
 > **Warning**
 >
-> elegant-json is **Work in Progress**!
+> `elegant-json` is **Work in Progress**!
 
 ### Installation
+
+- use pip
+
+```
+pip install elegant-json
+```
+
+- clone repo
 
 ```
 git clone https://github.com/hanjinliu/elegant-json
@@ -52,7 +60,7 @@ This is terrible.
 
 ##### In this module
 
-Copy json and substitute values you want with `Attr` object.
+Copy and paste the json text and substitute values you want with `Attr` objects.
 
 ```python
 from elegant_json import JsonClass, Attr
@@ -72,6 +80,8 @@ class C(JsonClass):
     values: list[int]
 
 c = C.load("path/to/json")  # or from a dict >>> c = C(js)
+
+# now all the attributes can be accessed like below
 c.title
 c.last_modified
 c.values[2]
