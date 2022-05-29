@@ -1,6 +1,6 @@
 from __future__ import annotations
 from types import GenericAlias
-from typing import Any, Iterable, TYPE_CHECKING, TypeVar, get_args, get_origin
+from typing import Any, TYPE_CHECKING, get_args, get_origin
 
 if TYPE_CHECKING:
     from ._json_class import JsonClass
@@ -17,7 +17,7 @@ def _define_converter(annotation):
             if isinstance(arg, type):
                 converter = lambda x: list(_define_converter(arg)(a) for a in x)
             else:
-                raise ValueError
+                raise ValueError(f"Wrong type annotation: {annotation!r}.")
         elif origin is dict:
             if args[0] is not str:
                 raise TypeError("Only dict[str, ...] is supported.")
@@ -25,11 +25,11 @@ def _define_converter(annotation):
             if isinstance(val, type):
                 converter = lambda x: {k: _define_converter(val)(v) for k, v in x.items()}
             else:
-                raise ValueError
+                raise ValueError(f"Wrong type annotation: {annotation!r}.")
         elif origin is tuple:
             converter = lambda x: tuple(_define_converter(arg)(a) for arg, a in zip(args, x))
         else:
-            raise ValueError
+            raise ValueError(f"Wrong type annotation: {annotation!r}.")
     else:
         converter = lambda x: annotation(x)
     return converter
@@ -41,10 +41,16 @@ class JsonProperty(property):
     def set_keys(self, keys):
         self._keys = keys
     
+    def getter(self, fget) -> JsonProperty:
+        return self.__class__(fget, self.fset, self.fdel, self.__doc__)
+    
     def setter(self, fset) -> JsonProperty:
-        return self.__class__(self.fget, fset)
+        return self.__class__(self.fget, fset, self.fdel, self.__doc__)
+
 
 class Attr:
+    """Attribute class for JsonClass."""
+    
     def __init__(
         self,
         name: str | None = None, 
@@ -57,7 +63,7 @@ class Attr:
         self.default = default
         self.mutable = mutable or False
         self.mutability_given = mutable is not None
-        self.converter = _define_converter(annotation)
+        self.annotation = annotation
         
     @property
     def name(self) -> str | None:
@@ -70,6 +76,7 @@ class Attr:
         self._name = value
     
     def to_property(self, keys: list[str | int]) -> JsonProperty:
+        converter = _define_converter(self.annotation)
         def fget(jself: JsonClass):
             out: Any = jself._json
             try:
@@ -77,7 +84,9 @@ class Attr:
                     out = out[k]
             except (KeyError, IndexError):
                 out = self.default
-            return self.converter(out)
+            else:
+                out = converter(out)
+            return out
         
         prop = JsonProperty(fget)
         

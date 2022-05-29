@@ -30,6 +30,8 @@ def _iter_list(l: Iterable[Any | None], keys: list[str | int]) -> Iterable[tuple
 
 
 class JsonClassMeta(type):
+    """The metaclass of JsonClass."""
+    
     __json_template__: dict[str, Any | None] = {}
     __json_mutable__: bool = False
     _json_properties: frozenset[str]
@@ -37,36 +39,44 @@ class JsonClassMeta(type):
     def __new__(
         cls: type,
         name: str,
-        bases: tuple,
-        namespace: dict,
+        bases: tuple[type, ...],
+        namespace: dict[str, Any],
         **kwds,
     ) -> JsonClassMeta:
         
-        js_temp = namespace.get(_JSON_TEMPLATE, {})
-        mutable = namespace.get(_JSON_MUTABLE, False)
+        _js_temp = namespace.get(_JSON_TEMPLATE, {})
+        _mutable = namespace.get(_JSON_MUTABLE, False)
+        _annot = namespace.get("__annotations__", {})
         props = set()
-        for value, keys in _iter_dict(js_temp, []):
-            if isinstance(value, str):
-                attr = Attr(value, mutable=mutable)
-            elif isinstance(value, Attr):
-                attr = value
+        
+        for attr, keys in _iter_dict(_js_temp, []):
+            if isinstance(attr, Attr):
                 if attr.name is None:
                     attr_name = keys[-1]
                     if not isinstance(attr_name, str):
                         raise ValueError
                     attr.name = attr_name
                 if not attr.mutability_given:
-                    attr.mutable = mutable
+                    attr.mutable = _mutable
+                
+                if attr.annotation is None:
+                    attr.annotation = _annot.get(attr.name)
+                
             else:
                 continue
+            
+            # check name collision
             if attr.name in props:
                 raise ValueError(f"Name collision in attributes: {attr.name!r}.")
             props.add(attr.name)
+            
+            # convert into a json-property
             prop = attr.to_property(keys)
             namespace[attr.name] = prop
         
         jcls: JsonClassMeta = type.__new__(cls, name, bases, namespace, **kwds)
         jcls._json_properties = frozenset(props)
+        
         return jcls
 
 

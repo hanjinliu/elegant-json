@@ -1,7 +1,7 @@
 from __future__ import annotations
 import json
 from pathlib import Path
-from typing import Callable, Literal, TypeVar, overload, Any
+from typing import Callable, Literal, TypeVar, overload, Any, Optional
 from ._json_class import JsonClass, _JSON_TEMPLATE, _JSON_MUTABLE
 from ._json_attribute import JsonProperty
 
@@ -22,15 +22,17 @@ def jsonclass(template_or_class: dict[str, Any | None], template: Literal[None] 
     
 def jsonclass(template_or_class=None, template=None, mutable=False):
     """
-
-    Parameters
-    ----------
-    cls_or_template : _type_, optional
-        _description_, by default None
-    template : _type_, optional
-        _description_, by default None
-    mutable : bool, optional
-        If true, properties are mutable.
+    Create a json class with specified template.
+    
+    This decorator is an alternative of ``JsonClass`` inheritance. Generally this
+    decorator will be used as following.
+    
+    >>> @jsonclass({...})
+    >>> class C: ...
+    
+    >>> @jsonclass
+    >>> class C: 
+    >>>     __json_template__ = {...}
 
     Returns
     -------
@@ -56,10 +58,12 @@ def jsonclass(template_or_class=None, template=None, mutable=False):
     else:
         raise TypeError
     
-    if not isinstance(template, dict):
-        raise TypeError("`template` must be given as a dict.")
-    
     def _func(cls_):
+        nonlocal template, mutable
+        template = getattr(cls, _JSON_TEMPLATE, template)
+        mutable = getattr(cls, _JSON_MUTABLE, mutable)
+        if not isinstance(template, dict):
+            raise TypeError("`template` must be given as a dict.")
         ns = {_JSON_TEMPLATE: template, _JSON_MUTABLE: mutable}
         return type(cls_.__name__, (cls_, JsonClass), ns)
     
@@ -111,7 +115,7 @@ def create_loader(
     template: dict[str, Any | None],
     mutable: bool = False,
     name: str | None = None
-) -> Callable[[str | Path | bytes, str | None], _dummy | JsonClass]:
+):
     """
     Create a loader function in a simple way.
     

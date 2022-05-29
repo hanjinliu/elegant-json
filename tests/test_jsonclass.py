@@ -3,31 +3,29 @@ import elegant_json as ej
 from pathlib import Path
 import pytest
 
-from elegant_json.core import jsonclass
-
 root = Path(__file__).parent / "jsons"
 
 template_1 = {
-    "key1": "arg1", 
-    "key2": "arg2",
-    "key3": [0, 1, "arg3"]
+    "key1": ej.Attr("arg1"), 
+    "key2": ej.Attr("arg2"),
+    "key3": [0, 1, ej.Attr("arg3")]
 }
 
 template_2 = {
     "key1": [
-        {"a": "arg1"},
-        {"b": "arg2"},
-        "arg3",
+        {"a": ej.Attr("arg1")},
+        {"b": ej.Attr("arg2")},
+        ej.Attr("arg3"),
     ],
 }
 
 template_3 = {
     "key1": {
-        "key1": "arg1",
+        "key1": ej.Attr("arg1"),
         "key2": {
-            "key1": "arg2",
+            "key1": ej.Attr("arg2"),
             "key2": {
-                "key1": "arg3",
+                "key1": ej.Attr("arg3"),
                 "key2": [],
             }
         }
@@ -87,7 +85,7 @@ def test_loader(temp, i, mutable):
     _common_part(c, mutable)
 
 def test_decorator():
-    @jsonclass(template_1)
+    @ej.jsonclass(template_1)
     class A:
         arg1: int
         arg2: str
@@ -95,7 +93,3 @@ def test_decorator():
         
     c = A.load(root/f"test1.json")
     _common_part(c, False)
-    
-    
-    
-    
