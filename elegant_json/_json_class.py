@@ -1,7 +1,9 @@
 from __future__ import annotations
 import json
 from pathlib import Path
-from typing import Any, Iterable
+from types import GenericAlias
+from typing import Any, Iterable, TYPE_CHECKING, TypeVar, get_args, get_origin
+
 
 _JSON_TEMPLATE = "__json_template__"
 _JSON_MUTABLE = "__json_mutable__"
@@ -26,36 +28,82 @@ def _iter_list(l: Iterable[Any | None], keys: list[str | int]) -> Iterable[tuple
         else:
             yield v, next_keys
 
-def _define_property(
-    name: str,
-    keys: list[str | int],
-    mutable: bool = False,
-    default: Any | None = None,
-) -> property:
-    if not name.isidentifier():
-        raise ValueError(f"{name!r} is not an identifier.")
-    def fget(self: JsonClass):
-        out = self._json
-        try:
-            for k in keys:
-                out = out[k]  # type: ignore
-        except (KeyError, IndexError):
-            out = default
-        return out
+def _define_converter(annotation):
+    if annotation is None:
+        converter = lambda x: x
+    elif isinstance(annotation, GenericAlias):
+        origin = get_origin(annotation)
+        args = get_args(annotation)
+        if origin is list:
+            arg = args[0]
+            if isinstance(arg, type):
+                converter = lambda x: list(_define_converter(arg)(a) for a in x)
+            else:
+                raise ValueError
+        elif origin is dict:
+            if args[0] is not str:
+                raise TypeError("Only dict[str, ...] is supported.")
+            val = args[1]
+            if isinstance(val, type):
+                converter = lambda x: {k: _define_converter(val)(v) for k, v in x.items()}
+            else:
+                raise ValueError
+        elif origin is tuple:
+            converter = lambda x: tuple(_define_converter(arg)(a) for arg, a in zip(args, x))
+        else:
+            raise ValueError
+    else:
+        converter = lambda x: annotation(x)
+    return converter
+
+class Attr:
+    def __init__(
+        self,
+        name: str | None = None, 
+        annotation: type | None = None,
+        *,
+        default = None,
+        mutable: bool | None = None,
+    ):
+        self.name = name
+        self.default = default
+        self.mutable = mutable or False
+        self.mutability_given = mutable is not None
+        self.converter = _define_converter(annotation)
+        
+    @property
+    def name(self) -> str | None:
+        return self._name
     
-    prop = property(fget)
+    @name.setter
+    def name(self, value: str | None):
+        if value is not None and not value.isidentifier():
+            raise ValueError(f"{value!r} is not an identifier.")
+        self._name = value
     
-    if mutable:
-        def fset(self: JsonClass, value):
-            out = self._json
-            for k in keys[:-1]:
-                out = out[k]  # type: ignore
-            out[keys[-1]] = value  # type: ignore
-            return None
-    
-        prop = prop.setter(fset)
-    
-    return prop
+    def to_property(self, keys: list[str | int]) -> property:
+        def fget(jself: JsonClass):
+            out = jself._json
+            try:
+                for k in keys:
+                    out = out[k]  # type: ignore
+            except (KeyError, IndexError):
+                out = self.default
+            return self.converter(out)
+        
+        prop = property(fget)
+        
+        if self.mutable:
+            def fset(jself: JsonClass, value):
+                out = jself._json
+                for k in keys[:-1]:
+                    out = out[k]  # type: ignore
+                out[keys[-1]] = value  # type: ignore
+                return None
+        
+            prop = prop.setter(fset)
+        
+        return prop
 
 class JsonClassMeta(type):
     __json_template__: dict[str, Any | None] = {}
@@ -71,12 +119,26 @@ class JsonClassMeta(type):
         
         js_temp = namespace.get(_JSON_TEMPLATE, {})
         mutable = namespace.get(_JSON_MUTABLE, False)
-        
-        for property_name, keys in _iter_dict(js_temp, []):
-            if not isinstance(property_name, str):
+        ns = set()
+        for value, keys in _iter_dict(js_temp, []):
+            if isinstance(value, str):
+                attr = Attr(value, mutable=mutable)
+            elif isinstance(value, Attr):
+                attr = value
+                if attr.name is None:
+                    attr_name = keys[-1]
+                    if not isinstance(attr_name, str):
+                        raise ValueError
+                    attr.name = attr_name
+                if not attr.mutability_given:
+                    attr.mutable = mutable
+            else:
                 continue
-            prop = _define_property(property_name, keys, mutable)
-            namespace[property_name] = prop
+            if attr.name in ns:
+                raise ValueError(f"Name collision in attributes: {attr.name!r}.")
+            ns.add(attr.name)
+            prop = attr.to_property(keys)
+            namespace[attr.name] = prop
         
         jcls: JsonClassMeta = type.__new__(cls, name, bases, namespace, **kwds)
         return jcls
@@ -93,10 +155,10 @@ class JsonClass(metaclass=JsonClassMeta):
         self._json = d
     
     def __repr__(self) -> str:
-        return f"{self.__class__.__name__}"
+        return f"<{self.__class__.__name__} object>"
     
     @property
-    def json(self) -> dict[str, Any]:
+    def json(self) -> dict[str, Any | None]:
         """Return the original json dictionary."""
         return self._json
     
