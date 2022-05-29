@@ -22,6 +22,23 @@ def test_generic():
     assert c.a == ["1", "a"]
     assert c.b == (1, "a")
     assert c.c == {"x": 1.0, "y": 2.3}
+
+def test_nested_generic():
+    class C(JsonClass):
+        __json_template__ = {
+            "a": Attr(annotation=list[tuple[int, str]]),
+        }
+        __json_mutable__ = True
+        a: list[tuple[int, str]]
+    
+    test_data = {
+        "a": [["1", "a"], ["2", "b"]],
+    }
+    
+    c = C(test_data)
+    assert type(c.a) is list
+    assert c.a[0] == (1, "a")
+    assert c.a[1] == (2, "b")
     
         
 def test_nested_json_class():
