@@ -106,14 +106,25 @@ class JsonClass(metaclass=JsonClassMeta):
         with open(path, mode="r", encoding=encoding) as f:
             js = json.load(f)
         return cls(js)
+    
+    @classmethod
+    def loads(cls, s: str | bytes):
+        """Deserialize input string and create a json class from it."""
+        js: dict[str, Any | None] = json.loads(s)
+        return cls(js)
+
+    def dump(self, path: str | Path | bytes, encoding: str | None = None) -> None:
+        """Save json object in a file."""
+        with open(path, mode="w", encoding=encoding) as f:
+            json.dump(self.json, f)
+        return None
 
     def attr_asdict(self) -> dict[str, Any | None]:
         """Summarize JsonClass properties into a dict."""
-        out: dict[str, Any | None] = {}
-        for jprop_name in self.__class__._json_properties:
-            value = getattr(self, jprop_name)
-            out[jprop_name] = value
-        return out
+        return {
+            name: getattr(self, name)
+            for name in self.__class__._json_properties
+        }
 
     def attr_astuple(self) -> tuple[Any | None, ...]:
         """Summarize JsonClass properties into a tuple."""
