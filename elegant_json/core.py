@@ -68,12 +68,75 @@ def jsonclass(template_or_class=None, template=None, mutable=False):
 class _dummy:
     """Dummy class for json class creation."""
 
-def create_constructor(template: dict[str, Any | None], mutable: bool = False, name=None):
+def create_constructor(
+    template: dict[str, Any | None],
+    mutable: bool = False,
+    name: str | None = None
+) -> type[_dummy | JsonClass]:
+    """
+    Create a JsonClass in a simple way.
+    
+    Instead of defining a base class, this function uses a dummy class and create
+    a constructor using a template dictionary only. As a result, typing of json
+    properties will be lost.
+    
+    Parameters
+    ----------
+    template : dict
+        JSON file template dictionary.
+    mutable : bool, default is False
+        Default mutability of properties.
+    name : str, optional
+        Name of the class. Automatically determined by default.
+    
+    Returns
+    -------
+    JsonClass subclass
+        A class implemented with properties extracted from the template dictionary.
+    
+    See also
+    --------
+    :func:`create_loader`
+    """
     cls = jsonclass(_dummy, template=template, mutable=mutable)
+    if name is None:
+        cls.__name__ = f"JsonClass{hex(id(cls))}"
+    else:
+        cls.__name__ = str(name)
+    cls.__qualname__ = f"elegant_json.{cls.__name__}"
+    cls.__module__ = "elegant_json"
     return cls
 
-def create_loader(template: dict[str, Any | None], mutable: bool = False, name=None):
-    cls = jsonclass(_dummy, template=template, mutable=mutable)
+def create_loader(
+    template: dict[str, Any | None],
+    mutable: bool = False,
+    name: str | None = None
+) -> Callable[[str | Path | bytes, str | None], _dummy | JsonClass]:
+    """
+    Create a loader function in a simple way.
+    
+    Unlike :func:`create_constructor`, this function returns a loader function
+    that takes file path as an input and returns a JsonClass object.
+    
+    Parameters
+    ----------
+    template : dict
+        JSON file template dictionary.
+    mutable : bool, default is False
+        Default mutability of properties.
+    name : str, optional
+        Name of the class. Automatically determined by default.
+    
+    Returns
+    -------
+    Callable
+        A loader function.
+    
+    See also
+    --------
+    :func:`create_constructor`
+    """
+    cls = create_constructor(template=template, mutable=mutable, name=name)
     # NOTE: simply this function can return `cls.load` but will not work if
     # new class has `load` property by chance.
     def load(path: str | Path | bytes, encoding: str | None = None):
@@ -84,6 +147,14 @@ def create_loader(template: dict[str, Any | None], mutable: bool = False, name=N
 
 
 def isformatted(obj, json_class: type[JsonClass]) -> bool:
+    """
+    Check if the input object is in ``json_class`` format.
+    
+    This function is free of error, as long as a ``JsonClass`` object is given as
+    the second argument.
+    """
+    if not issubclass(json_class, JsonClass):
+        raise TypeError("The second argument of `isformatted` must be a JsonClass.")
     if not isinstance(obj, dict):
         return False
     for name in json_class._json_properties:
