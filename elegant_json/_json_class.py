@@ -1,8 +1,12 @@
 from __future__ import annotations
 import json
+from pathlib import Path
 from typing import Any, Iterable
 
-def _iter_dict(d: dict[str, Any], keys: list[str | int]) -> Iterable[tuple[Any, list[str | int]]]:
+_JSON_TEMPLATE = "__json_template__"
+_JSON_MUTABLE = "__json_mutable__"
+
+def _iter_dict(d: dict[str, Any | None], keys: list[str | int]) -> Iterable[tuple[Any | None, list[str | int]]]:
     for k, v in d.items():
         next_keys = keys + [k]
         if isinstance(v, (list, tuple)):
@@ -12,7 +16,7 @@ def _iter_dict(d: dict[str, Any], keys: list[str | int]) -> Iterable[tuple[Any, 
         else:
             yield v, next_keys
 
-def _iter_list(l: list[Any], keys: list[str | int]) -> Iterable[tuple[Any, list[str | int]]]:
+def _iter_list(l: Iterable[Any | None], keys: list[str | int]) -> Iterable[tuple[Any | None, list[str | int]]]:
     for k, v in enumerate(l):
         next_keys = keys + [k]
         if isinstance(v, (list, tuple)):
@@ -34,32 +38,31 @@ def _define_property(
         out = self._json
         try:
             for k in keys:
-                out = out[k]
+                out = out[k]  # type: ignore
         except (KeyError, IndexError):
             out = default
         return out
-        
+    
+    prop = property(fget)
+    
     if mutable:
         def fset(self: JsonClass, value):
             out = self._json
             for k in keys[:-1]:
-                out = out[k]
-            out[keys[-1]] = value
+                out = out[k]  # type: ignore
+            out[keys[-1]] = value  # type: ignore
             return None
-    else:
-        fset = None
     
-    return property(fget, fset)
-
-
-_JSON_TEMPLATE = "__json_template__"
-_JSON_MUTABLE = "__json_mutable__"
+        prop = prop.setter(fset)
+    
+    return prop
 
 class JsonClassMeta(type):
-    __json_template__ = {}
-    __json_mutable__ = False
+    __json_template__: dict[str, Any | None] = {}
+    __json_mutable__: bool = False
+
     def __new__(
-        fcls: type,
+        cls: type,
         name: str,
         bases: tuple,
         namespace: dict,
@@ -75,13 +78,14 @@ class JsonClassMeta(type):
             prop = _define_property(property_name, keys, mutable)
             namespace[property_name] = prop
         
-        cls: JsonClassMeta = type.__new__(fcls, name, bases, namespace, **kwds)
-        return cls
+        jcls: JsonClassMeta = type.__new__(cls, name, bases, namespace, **kwds)
+        return jcls
+
 
 class JsonClass(metaclass=JsonClassMeta):
     """The base class of json class."""
     
-    def __init__(self, d: dict[str, Any], /):
+    def __init__(self, d: dict[str, Any | None], /):
         if not isinstance(d, dict):
             raise TypeError(
                 f"Input of {self.__class__.__name__} must be a dict, got {type(d)}"
@@ -97,35 +101,8 @@ class JsonClass(metaclass=JsonClassMeta):
         return self._json
     
     @classmethod
-    def load(cls, path: str, encoding: str | None = None):
+    def load(cls, path: str | Path | bytes, encoding: str | None = None):
         """Load a json file and create a json class from it."""
         with open(path, mode="r", encoding=encoding) as f:
             js = json.load(f)
         return cls(js)
-
-
-"""
-d = {"a": [None, "arg1"],
-     "b": "arg2",
-     "c": {
-         "x": "arg3"
-     }}
-
-class C(JsonClass):
-    __json_template__ = d
-    a: int
-C().a
-
-@make(d)
-class C:
-    a: int
-C().a
-
-constructor = make_constructor(d)
-ins = constructor(js)
-ins.a
-
-loader = make_loader(d)
-ins = loader(path)
-ins.a
-"""

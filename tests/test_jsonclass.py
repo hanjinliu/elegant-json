@@ -1,6 +1,9 @@
+from typing import Any
 import elegant_json as ej
 from pathlib import Path
 import pytest
+
+from elegant_json.core import jsonclass
 
 root = Path(__file__).parent / "jsons"
 
@@ -31,7 +34,7 @@ template_3 = {
     }
 }
 
-def _common_part(c: ej.JsonClass, mutable):
+def _common_part(c, mutable):
     assert c.arg1 == 1
     assert c.arg2 == "a"
     assert c.arg3 == [1, 2, 3]
@@ -69,7 +72,7 @@ def test_json_class(temp, i, mutable):
 def test_constructor(temp, i, mutable):
     init = ej.create_constructor(temp, mutable=mutable)
     
-    c = init.load(root/f"test{i}.json")
+    c = init.load(root/f"test{i}.json")  # type: ignore
     _common_part(c, mutable)
 
 @pytest.mark.parametrize(
@@ -82,4 +85,17 @@ def test_loader(temp, i, mutable):
     
     c = loader(root/f"test{i}.json")
     _common_part(c, mutable)
+
+def test_decorator():
+    @jsonclass(template_1)
+    class A:
+        arg1: int
+        arg2: str
+        arg3: list[int]
+        
+    c = A.load(root/f"test1.json")
+    _common_part(c, False)
+    
+    
+    
     

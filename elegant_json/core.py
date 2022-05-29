@@ -1,21 +1,25 @@
 from __future__ import annotations
 import json
-from typing import Callable, TypeVar, overload
+from pathlib import Path
+from typing import Callable, Literal, TypeVar, overload, Any
 from ._json_class import JsonClass, _JSON_TEMPLATE, _JSON_MUTABLE
 
-_C = TypeVar("_C", bound=type)
+_C = TypeVar("_C")
 
 @overload
-def jsonclass(cls: type[_C], template: dict | None = None, mutable: bool = False) -> type[_C | JsonClass]:
+def jsonclass(template_or_class: type[_C], template: dict[str, Any | None], mutable: bool = False) -> type[_C | JsonClass]:
     ...
 
-
 @overload
-def jsonclass(template: dict | None = None, mutable: bool = False) -> Callable[[type[_C]], type[_C | JsonClass]]:
+def jsonclass(template_or_class: Literal[None], template: dict[str, Any | None], mutable: bool = False) -> Callable[[type[_C]], type[_C | JsonClass]]:
+    ...
+    
+@overload
+def jsonclass(template_or_class: dict[str, Any | None], template: Literal[None] = None, mutable: bool = False) -> Callable[[type[_C]], type[_C | JsonClass]]:
     ...
 
     
-def jsonclass(cls_or_template = None, template=None, mutable=False):
+def jsonclass(template_or_class=None, template=None, mutable=False):
     """
 
     Parameters
@@ -41,32 +45,38 @@ def jsonclass(cls_or_template = None, template=None, mutable=False):
     >>> c = C()
     >>> c.a  # get some value
     """
-    if isinstance(cls_or_template, type):
-        cls = cls_or_template
-    elif isinstance(cls_or_template, dict):
+    if isinstance(template_or_class, type):
+        cls = template_or_class
+    elif isinstance(template_or_class, dict):
         cls = None
-        template = cls_or_template
-    elif cls_or_template is None:
+        template = template_or_class
+    elif template_or_class is None:
         cls = None
     else:
         raise TypeError
-    ns = {_JSON_TEMPLATE: template, _JSON_MUTABLE: mutable}
-    new_cls = type(cls.__name__, (cls, JsonClass), ns)
-    return new_cls
+    
+    if not isinstance(template, dict):
+        raise TypeError("`template` must be given as a dict.")
+    
+    def _func(cls_):
+        ns = {_JSON_TEMPLATE: template, _JSON_MUTABLE: mutable}
+        return type(cls_.__name__, (cls_, JsonClass), ns)
+    
+    return _func if cls is None else _func(cls)
 
 class _dummy:
-    pass
+    """Dummy class for json class creation."""
 
-def create_constructor(template=None, mutable=False):
+def create_constructor(template: dict[str, Any | None], mutable: bool = False, name=None):
     cls = jsonclass(_dummy, template=template, mutable=mutable)
     return cls
 
-def create_loader(template=None, mutable=False):
+def create_loader(template: dict[str, Any | None], mutable: bool = False, name=None):
     cls = jsonclass(_dummy, template=template, mutable=mutable)
     # NOTE: simply this function can return `cls.load` but will not work if
     # new class has `load` property by chance.
-    def load(path: str, encoding: str | None = None):
+    def load(path: str | Path | bytes, encoding: str | None = None):
         with open(path, mode="r", encoding=encoding) as f:
             js = json.load(f)
-        return cls(js)
+        return cls(js)  # type: ignore
     return load
