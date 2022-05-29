@@ -1,12 +1,13 @@
 from __future__ import annotations
 from types import GenericAlias
-from typing import Any, TYPE_CHECKING, get_args, get_origin
+from typing import Any, TYPE_CHECKING, ForwardRef, get_args, get_origin
+from typing import _eval_type  # type: ignore
 
 if TYPE_CHECKING:
     from ._json_class import JsonClass
 
 
-def _define_converter(annotation):
+def _define_converter(annotation: type | GenericAlias | ForwardRef | None):
     if annotation is None:
         converter = lambda x: x
     elif isinstance(annotation, GenericAlias):
@@ -30,6 +31,10 @@ def _define_converter(annotation):
             converter = lambda x: tuple(_define_converter(arg)(a) for arg, a in zip(args, x))
         else:
             raise ValueError(f"Wrong type annotation: {annotation!r}.")
+    elif isinstance(annotation, (str, ForwardRef)):
+        if isinstance(annotation, str):
+            annotation = ForwardRef(annotation)
+        converter = _define_converter(_eval_type(annotation, None, None))
     else:
         converter = lambda x: annotation(x)
     return converter
