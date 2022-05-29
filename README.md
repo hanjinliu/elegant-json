@@ -3,6 +3,7 @@
 Deal with JSON files elegantly.
 
 > **Warning**
+>
 > elegant-json is **Work in Progress**!
 
 ### Installation
@@ -42,8 +43,11 @@ js["data"]["values"][2]
 ```
 
 This is terrible.
+
 &cross; typing
+
 &cross; missing values
+
 &cross; readability
 
 ##### In this module
