@@ -112,6 +112,24 @@ class JsonClass(metaclass=JsonClassMeta):
         """Deserialize input string and create a json class from it."""
         js: dict[str, Any | None] = json.loads(s)
         return cls(js)
+    
+    @classmethod
+    def create(cls, value: Any | None = None):
+        """
+        Create a JsonClass object initialized with the given value.
+
+        Parameters
+        ----------
+        value : any object, optional
+            Initial value of Attr objects
+
+        Returns
+        -------
+        JsonClass
+            A new instance.
+        """
+        d = _deep_copy(cls.__json_template__, value)
+        return cls(d)
 
     def dump(self, path: str | Path | bytes, encoding: str | None = None) -> None:
         """Save json object in a file."""
@@ -132,3 +150,29 @@ class JsonClass(metaclass=JsonClassMeta):
             getattr(self, jprop_name) 
             for jprop_name in self.__class__._json_properties
         )
+
+class Undefined:
+    def _raise(self, *args, **kwargs):
+        raise ValueError("undefined")
+
+    def __repr__(self) -> str:
+        return "<undefined>"
+
+    __int__ = _raise
+    __float__ = _raise
+    __str__ = _raise
+    __iter__ = _raise
+    __bool__ = _raise
+    __getattr__ = _raise
+    __setattr__ = _raise
+
+undefined = Undefined()
+
+def _deep_copy(x: Any, value: Any = undefined):
+    if isinstance(x, (list, tuple)):
+        return type(x)(_deep_copy(a, value) for a in x)
+    elif isinstance(x, dict):
+        return {k: _deep_copy(v, value) for k, v in x.items()}
+    elif isinstance(x, Attr):
+        return value
+    return x

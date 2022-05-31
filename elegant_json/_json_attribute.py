@@ -35,8 +35,10 @@ def _define_converter(annotation: type | GenericAlias | ForwardRef | None):
         if isinstance(annotation, str):
             annotation = ForwardRef(annotation)
         converter = _define_converter(_eval_type(annotation, None, None))
-    else:
+    elif type(annotation) is type or hasattr(annotation, "__json_template__"):
         converter = lambda x: annotation(x)
+    else:
+        converter = lambda x: x
     return converter
 
 class JsonProperty(property):
@@ -107,3 +109,8 @@ class Attr:
         
         prop.set_keys(keys)
         return prop
+    
+    def __copy__(self) -> Attr:
+        return self.__class__(
+            self.name, self.annotation, default=self.default, mutable=self.mutable
+        )

@@ -1,6 +1,8 @@
+from typing import Any
 import elegant_json as ej
 from pathlib import Path
 import pytest
+from copy import deepcopy
 
 root = Path(__file__).parent / "jsons"
 
@@ -52,7 +54,7 @@ def _common_part(c, mutable):
 @pytest.mark.parametrize("mutable", [False, True])
 def test_json_class(temp, i, mutable):
     class C(ej.JsonClass):
-        __json_template__ = temp
+        __json_template__ = deepcopy(temp)
         __json_mutable__ = mutable
         arg1: int
         arg2: str
@@ -67,7 +69,7 @@ def test_json_class(temp, i, mutable):
 )
 @pytest.mark.parametrize("mutable", [False, True])
 def test_constructor(temp, i, mutable):
-    init = ej.create_constructor(temp, mutable=mutable)
+    init = ej.create_constructor(deepcopy(temp), mutable=mutable)
     
     c = init.load(root/f"test{i}.json")  # type: ignore
     _common_part(c, mutable)
@@ -78,13 +80,13 @@ def test_constructor(temp, i, mutable):
 )
 @pytest.mark.parametrize("mutable", [False, True])
 def test_loader(temp, i, mutable):
-    loader = ej.create_loader(temp, mutable=mutable)
+    loader = ej.create_loader(deepcopy(temp), mutable=mutable)
     
     c = loader(root/f"test{i}.json")
     _common_part(c, mutable)
 
 def test_decorator():
-    @ej.jsonclass(template_1)
+    @ej.jsonclass(deepcopy(template_1))
     class A:
         arg1: int
         arg2: str
@@ -96,7 +98,7 @@ def test_decorator():
 def test_override():
     temp = {"load": ej.Attr()}
     class A(ej.JsonClass):
-        __json_template__ = temp
+        __json_template__ = deepcopy(temp)
     
     a = A({"load": 0})
     assert a.load == 0
@@ -107,4 +109,19 @@ def test_override():
     
     a = B({"load": 0})
     assert a.load == 0
+
+
+@pytest.mark.parametrize("temp", [template_1, template_2, template_3])
+def test_create(temp):
+    class C(ej.JsonClass):
+        __json_template__ = deepcopy(temp)
+        arg1: Any
+        arg2: Any
+        arg3: Any
+    
+    value = object()
+    c = C.create(value=value)
+    assert c.arg1 == value
+    assert c.arg2 == value
+    assert c.arg3 == value
     
